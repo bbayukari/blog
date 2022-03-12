@@ -1,24 +1,11 @@
-本文是用来指导安装https://github.com/kthohr/optim 的说明文档，主要给新手或者三个月后的自己看，所以这里说活风格可能随意一些，不太严谨。
+本文是用来指导生成这个项目（https://github.com/kthohr/optim ）的__库文件__的说明文档，主要给新手或者三个月后的自己看，所以这里说活风格可能随意一些，不太严谨。
 
 首先，如果你是常在linux命令行间驰骋，各种库各种语言开发的大佬，那就没必要看本文了，直接参考项目里的安装说明即可。
-其次，如果你是从没用过命令行，没接触过Linux，当然可以现学，不过也许宇宙第一IDE---Visual Studio的教程更适合你，不过我没弄懂，要是成了请教教我。
-
-不过从这段代码来看vs可能不是个好选择。
-```
-#ifdef _MSC_VER
-    #error OptimLib: MSVC is not supported
-#endif
-```
+其次，如果你是从没用过命令行，没接触过Linux，本文也没什么用。
 
 现在正式开始，先来看一下关键的问题：核心难点就在于项目作者只提供了Linux下的安装方式，所以如果你手上有Linux系统的PC，服务器，就好说了，Mac的话，没用过，不过听说跟Linux比较像，估计也行。所以如果你只有windows系统的电脑，或者对Linux不熟悉虽然有但没怎么用过，你可以接着看了。
 
-经过一整天的调查学习，我得到了三种安装方式，并终于在凌晨成功了其中一种方式，其他两种方式有时间再更。先说说那两种失败的方法吧。
-
-## CMAKE
-
-首先上介绍：CMake is an open-source, cross-platform family of tools designed to build, test and package software. CMake is used to control the software compilation process using simple platform and compiler independent configuration files, and generate native makefiles and workspaces that can be used in the compiler environment of your choice. The suite of CMake tools were created by Kitware in response to the need for a powerful, cross-platform build environment for open-source projects such as ITK and VTK.
-
-关键词cross-platform跨平台，这条路应该能成，因为那个项目有个issue，作者给了个CMakeList.txt，位置是https://github.com/kthohr/optim/issues/11。
+经过一整天的调查学习，我得到了两种安装方式，并终于在凌晨成功了其中一种方式，其他两种方式有时间再更。先说说那两种失败的方法吧。
 
 ## MSYS2
 
