@@ -4,11 +4,21 @@
 using namespace std;
 using namespace Eigen;
 
+void foo(Map<VectorXd>& a){
+    VectorXd c(5);
+    c << 10,20,30,40,50;
+    a = c;
+}
+
 int main(){
-    double n[5]{1.1,2.2,3.3,4.4,5.5};
-    double const *x = n;
-    Map<VectorXd const> v(x,5);
-    MatrixXd m = MatrixXd::Ones(5,5);
-    cout << m*v; 
+    VectorXd x(3), y(3);
+    MatrixXd m(3,3);
+    x << 1,2,1;
+    y << 10,20,30;
+    m << 1,0,0,0,1,0,0,0,1;
+    y(0) = (x.transpose() * m * x)(0) /1;
+    cout << y(x);
+
+    cout << y;
     return 0;
 }
