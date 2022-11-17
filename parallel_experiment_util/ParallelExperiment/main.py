@@ -1,7 +1,7 @@
 import pandas as pd
 import multiprocessing as mp
 import numpy as np
-from util import product_dict
+from .util import product_dict
 
 class ParallelExperiment:
     def __init__(self, task, in_keys, out_keys, processes=1, name="test"):
