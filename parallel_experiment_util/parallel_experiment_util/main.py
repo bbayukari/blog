@@ -39,13 +39,10 @@ class ParallelExperiment:
         if not isinstance(result, dict) or set(result.keys()) != set(self.out_keys):
             raise RuntimeError("out_parameter's keys do not match!\n{}\n{}".format(self.out_keys, set(result.keys())))
 
-    def run(self, in_para_list = None, /, **in_para):
+    def run(self, in_para_list):
         """
-        in_para.keys should be the same as self.in_keys and in_para.values should be arrays.
+        in_para_list is a list of dict, each dict is a in_para which in_para.keys should be the same as self.in_keys and in_para.values should be arrays.
         """
-        if in_para_list is None:
-            in_para_list = product_dict(**in_para)
-
         with mp.Pool(processes=self.processes) as pool:
             self.results.extend(
                 pool.starmap(

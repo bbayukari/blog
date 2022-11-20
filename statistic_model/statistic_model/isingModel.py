@@ -1,6 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
 import statistic_model_pybind
+import cvxpy as cp
 
 def ising_generator(P, N, Edges, seed):
     """
@@ -94,4 +95,22 @@ def ising_loss_no_intercept(para, data):
                 elif t < s:
                     tmp += para[int((2*data.p-t)*(t+1)/2+s-t-1-data.p)] * data.table[i,t]
             loss += data.freq[i] * jnp.log(1+jnp.exp(tmp))
+    return loss
+
+def ising_loss_cvxpy_no_intercept(para, data):
+    loss = 0.0
+    for i in range(data.table.shape[0]):
+        idx = 0
+        for s in range(data.p):
+            for t in range(s+1,data.p):
+                loss -= 2 * data.freq[i] * data.table[i,s] * data.table[i,t] * para[idx]
+                idx += 1
+        for s in range(data.p):
+            tmp = 0.0
+            for t in range(data.p):
+                if t > s:
+                    tmp += para[int((2*data.p-s)*(s+1)/2+t-s-1-data.p)] * data.table[i,t]
+                elif t < s:
+                    tmp += para[int((2*data.p-t)*(t+1)/2+s-t-1-data.p)] * data.table[i,t]
+            loss += data.freq[i] * cp.logistic(tmp)
     return loss

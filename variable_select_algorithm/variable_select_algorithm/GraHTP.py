@@ -108,8 +108,8 @@ def GraHTP(
     return final_estimator
 
 
-def GraHTP_cv(loss_fn, dim, support_size, data, grad_fn):
-    step_size_cv = [0.0001, 0.0005, 0.05, 0.1] + [(s + 1) / 1000 for s in range(10)]
+def GraHTP_cv(loss_fn, dim, support_size, data, grad_fn=None):
+    step_size_cv = np.logspace(-4, -2, 10)
 
     best_estimator = np.zeros(dim)
     min_loss = loss_fn(best_estimator, data)

@@ -67,21 +67,20 @@ def para_generator(*args, repeat=1, seed=None):
             seed=1234
         )
     """
-    para = []
-    for dict_of_para in args:
-        para.extend(product_dict(**dict_of_para))
-    
-    del_duplicate(para)
-
-    para = para * repeat
-
-    if seed is not None:
-        for i in range(len(para)):
-            para[i]['seed'] = i+seed
-
-    return para
-
+    for group_of_para in args:
+        for para in product_dict(**group_of_para):
+            for i in range(repeat):
+                if seed is not None:
+                    para['seed'] = seed
+                    seed += 1
+                yield para
 
 
 if __name__ == "__main__":
-    pass
+    for para in para_generator(
+            {"n": [i * 100 + 100 for i in range(5)], "p": [500], "k": [50]},
+            {"n": [500], "p": [i * 100 + 100 for i in range(5)], "k": [50]},
+            repeat=3,
+            seed=1234
+    ):
+        print(para)

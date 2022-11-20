@@ -53,15 +53,13 @@ def GraSP(
 
         # identify directions
         if 2*support_size < dim:
-            Omega = np.nonzero(z[np.argpartition(np.abs(z), -2*support_size)[-2*support_size:]])[0] # supp(z_2s)
+            Omega = [idx for idx in np.argpartition(np.abs(z), -2*support_size)[-2*support_size:] if z[idx] != 0.0] # supp of top 2k largest absolute values of gradient
         else:
             Omega = np.nonzero(z)[0] # supp(z)
 
         # merge supports
         support_new = np.unique(np.append(Omega, x_old.nonzero()[0])) 
         
-
-
         # minimize 
         try:
             def opt_f(x, gradient):
