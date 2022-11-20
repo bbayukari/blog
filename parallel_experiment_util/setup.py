@@ -2,10 +2,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='ParallelExperiment',
+    name='parallel_experiment_util',
     author='Ang',
     packages=find_packages(),
-    description="ParallelExperiment: use for parallel experiment",
+    description="parallel_experiment_util: use for parallel experiment",
     install_requires=[
         "numpy",
         "pandas"

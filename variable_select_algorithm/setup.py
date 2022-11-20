@@ -1,13 +1,14 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='VariableSelect',
+    name='variable_select_algorithm',
     author='Ang',
     packages=find_packages(),
-    description="VariableSelect: several algorithms of general variable selection for comparison with abess",
+    description="variable_select_algorithm: several algorithms of general variable selection for comparison with abess",
     install_requires=[
         "numpy",
         "nlopt",
-        "cvxpy"
+        "cvxpy",
+        "jax",
     ]
 )

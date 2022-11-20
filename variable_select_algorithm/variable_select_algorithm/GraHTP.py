@@ -1,12 +1,13 @@
 import numpy as np
 import nlopt
 
+
 def GraHTP(
-    loss,
-    grad,
+    loss_fn,
     dim,
     support_size,
-    data=None,
+    data,
+    grad_fn=None,
     fast=False,
     final_support_size=-1,
     x_init=None,
@@ -15,13 +16,13 @@ def GraHTP(
 ):
     """GraHTP algorithm
     Args:
-        loss: function (x, data, active_index) -> loss_value
-        grad: function (x, data, active_index, compute_index) -> gradient_vector
+        loss_fn: function (x, data) -> loss_value
             x: array with the shape of (dim,)
             data: dictionary, data for loss and grad
-            active_index: int array, the index of nonzore features, default is None which means it's np.arange(dim)
-            compute_index: int array, the index of features which gradient is computed
-            gradient_vector.shape = compute_index.shape, default is None which means it's same with active_index
+        grad_fn: function (x, data, compute_para_index) -> gradient_vector
+            x, data: same as loss_fn
+            compute_para_index: array which contains the index of parameters need to compute gradient
+            default: None, algorithm will compute gradient by jax, in this case loss_fn must be coded by jax.
         dim: int, dimension of the model which is the length of x
         support_size: the number of selected features for algorithm
         data: dictionary, data for loss and grad
@@ -32,19 +33,43 @@ def GraHTP(
     Returns:
         estimator: array with the shape of (dim,) which contains k nonzero entries
     """
+    if grad_fn is None:
+        from jax import jacfwd
+        import jax.numpy as jnp
+
+        loss_fn_jax = loss_fn
+        loss_fn = lambda x, data: loss_fn_jax(x, data).item()
+
+        def func_(para_compute, data, para, index):
+            para_complete = para.at[index].set(para_compute)
+            return loss_fn_jax(para_complete, data)
+
+        def grad_fn(para, data, compute_para_index):
+            para_j = jnp.array(para)
+            para_compute_j = jnp.array(para[compute_para_index])
+            return np.array(
+                jacfwd(
+                    func_
+                )(  ## forward mode automatic differentiation is faster than reverse mode
+                    para_compute_j, data, para_j, compute_para_index
+                )
+            )
+
     if x_init is None:
         x_init = np.zeros(dim)
-    
+
     if final_support_size < 0:
         final_support_size = support_size
-    
+
     # init
     x_old = x_init
-    support_old = np.argpartition(np.abs(x_old), -support_size)[-support_size:] # the index of support_size largest entries
+    support_old = np.argpartition(np.abs(x_old), -support_size)[
+        -support_size:
+    ]  # the index of support_size largest entries
 
     for iter in range(max_iter):
         # S1: gradient descent
-        x_bias = x_old - step_size * grad(x_old, data)
+        x_bias = x_old - step_size * grad_fn(x_old, data, np.arange(dim))
         # S2: Gradient Hard Thresholding
         support_new = np.argpartition(np.abs(x_bias), -support_size)[-support_size:]
         # S3: debise
@@ -53,12 +78,13 @@ def GraHTP(
             x_new[support_new] = x_bias[support_new]
         else:
             try:
+
                 def opt_f(x, gradient):
                     x_full = np.zeros(dim)
                     x_full[support_new] = x
                     if gradient.size > 0:
-                        gradient[:] = grad(x_full, data, support_new)
-                    return loss(x_full, data, support_new)    
+                        gradient[:] = grad_fn(x_full, data, support_new)
+                    return loss_fn(x_full, data)
 
                 opt = nlopt.opt(nlopt.LD_SLSQP, support_size)
                 opt.set_min_objective(opt_f)
@@ -73,13 +99,16 @@ def GraHTP(
         x_old = x_new
         support_old = support_new
 
-    final_support = np.argpartition(np.abs(x_new), -final_support_size)[-final_support_size:]
+    final_support = np.argpartition(np.abs(x_new), -final_support_size)[
+        -final_support_size:
+    ]
     final_estimator = np.zeros(dim)
     final_estimator[final_support] = x_new[final_support]
 
     return final_estimator
 
-def GraHTP_cv(loss_fn, grad_fn, dim, support_size, data):
+
+def GraHTP_cv(loss_fn, dim, support_size, data, grad_fn):
     step_size_cv = [0.0001, 0.0005, 0.05, 0.1] + [(s + 1) / 1000 for s in range(10)]
 
     best_estimator = np.zeros(dim)
@@ -88,7 +117,14 @@ def GraHTP_cv(loss_fn, grad_fn, dim, support_size, data):
     fail_times = 0
     for step_size in step_size_cv:
         try:
-            x = GraHTP(loss_fn, grad_fn, dim, support_size, step_size=step_size, data=data)
+            x = GraHTP(
+                loss_fn=loss_fn,
+                dim=dim,
+                support_size=support_size,
+                data=data,
+                grad_fn=grad_fn,
+                step_size=step_size,
+            )
             loss = loss_fn(x, data)
             if loss < min_loss:
                 min_loss = loss

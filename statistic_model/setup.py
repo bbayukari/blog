@@ -1,8 +1,9 @@
 from pybind11.setup_helpers import Pybind11Extension
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="statistic_model",
+    packages=find_packages(),
     version="0.0.1",
     author="",
     author_email="",
@@ -17,5 +18,6 @@ setup(
             cxx_std=17,
             ),
     ],
+    install_requires=["numpy", "jax"],
     python_requires=">=3.7",
 )

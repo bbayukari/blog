@@ -8,7 +8,7 @@
 #include <Eigen/Eigen>
 
 #include "autodiff/forward/dual.hpp"
-//#include "autodiff/forward/dual/eigen.hpp"
+//#include "autodiff/forward/dual/eigen.hpp" // not needed because ising_model() does not use Matrix multiplication of Eigen 
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -60,19 +60,18 @@ struct RegressionData {
 //**********************************************************************************
 double linear_loss_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();  // unwrap the pointer
-    std::cout << "loss" << (data->x * para - data->y).squaredNorm() << std::endl;
     return (data->x * para - data->y).squaredNorm();  // compute the loss
 }
 VectorXd linear_gradient_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
     RegressionData* data = ex_data.cast<RegressionData*>();  // unwrap the pointer
-    std::cout << "gradient" << 2 * slice(data->x,compute_para_index).transpose() * (data->x * para - data->y) << std::endl;
-    return 2 * slice(data->x,compute_para_index).transpose() * (data->x * para - data->y);  // compute the gradient
+    VectorXd result = 2 * slice(data->x,compute_para_index).transpose() * (data->x * para - data->y);
+    return result;  // compute the gradient
 }
 MatrixXd linear_hessian_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
     RegressionData* data = ex_data.cast<RegressionData*>();  // unwrap the pointer
     MatrixXd X_compute = slice(data->x,compute_para_index);
-    std::cout << "hessian" << X_compute.transpose() * X_compute << std::endl;
-    return 2 * X_compute.transpose() * X_compute;  // compute the hessian
+    MatrixXd result = 2 * X_compute.transpose() * X_compute;
+    return result;  // compute the hessian
 }
 
 //**********************************************************************************
@@ -183,17 +182,20 @@ template <class T>
 T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, py::object const& ex_data) {
     IsingData* data = ex_data.cast<IsingData*>();
     T loss = T(0.0);
-    
+    bool has_intercept = intercept.size() == data->p;
+
     for(int i = 0; i < data->table.rows(); i++){
         int idx = 0;
         for(int s = 0; s < data->p; s++){
-            loss -= data->freq(i) * data->table(i,s) * intercept(s);
+            if (has_intercept){
+                loss -= data->freq(i) * data->table(i,s) * intercept(s);
+            }
             for(int t = s+1; t < data->p; t++){
                 loss -= 2 * data->freq(i) * data->table(i,s) * data->table(i,t) * para(idx++);
             }
         }
         for(int s = 0; s < data->p; s++){
-            T tmp = intercept(s);
+            T tmp = has_intercept ? intercept(s) : T(0.0);
             for(int t = 0; t < data->p; t++){
                 if(t > s)
                     tmp += para((2*data->p-s)*(s+1)/2+t-s-1-data->p) * data->table(i,t);
@@ -210,7 +212,7 @@ T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, p
 // pybind11 module
 //**********************************************************************************
 PYBIND11_MODULE(statistic_model_pybind,m) {
-    // export the data structure CustomData and its constructor
+    // data structure CustomData and its constructor
     pybind11::class_<RegressionData>(m, "RegressionData").def(py::init<MatrixXd, VectorXd>());
     // linear model
     m.def("linear_loss_no_intercept", &linear_loss_no_intercept);
@@ -220,8 +222,11 @@ PYBIND11_MODULE(statistic_model_pybind,m) {
     m.def("logistic_loss_no_intercept", &logistic_loss_no_intercept);
     m.def("logistic_gradient_no_intercept", &logistic_gradient_no_intercept);
     m.def("logistic_hessian_no_intercept", &logistic_hessian_no_intercept);
-    // ising model
+    // Ising data constructor
+    m.def("ising_generator", &sample_by_conf);
+    // data structure IsingData and its constructor
     py::class_<IsingData>(m, "IsingData").def(py::init<MatrixXd>());
+    // ising model
     m.def("ising_model",
           py::overload_cast<Matrix<double, -1, 1> const&, Matrix<double, -1, 1> const&, py::object const&>(
               &ising_model<double>));

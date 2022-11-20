@@ -2,7 +2,7 @@ import cvxpy as cp
 import numpy as np
 
 
-def lasso(loss_cvxpy, dim, support_size, data=None):
+def Lasso(loss_cvxpy, dim, support_size, data=None, init_lambda=1.0, max_iter=100):
     """lasso algorithm
     Args:
         loss_cvxpy: cvxpy function (x, data) -> loss_value
@@ -22,15 +22,22 @@ def lasso(loss_cvxpy, dim, support_size, data=None):
     x = cp.Variable(dim)
     lambd = cp.Parameter(nonneg=True)
     problem = cp.Problem(cp.Minimize(object_fn(x, lambd)))
-    min_estimator = np.zeros(dim)
-    min_loss = loss_cvxpy(min_estimator, data)
 
-    for v in np.logspace(-2, 3, 50):
-        lambd.value = v
+    lambd_lowwer = 0.0
+    lambd.value = 1.0
+
+    for i in range(max_iter):
         problem.solve()
-        loss = loss_cvxpy(x.value, data)
-        if loss < min_loss:
-            min_loss = loss
-            min_estimator = x.value
+        estimator = x.value
+        tol = np.mean(np.partition(np.abs(estimator), -support_size)[-support_size:]) / 10
+        support_size_est = np.array(abs(estimator) > tol).sum() 
+        if support_size_est > support_size:
+            lambd_lowwer = lambd.value
+            lambd.value = 2 * lambd.value
+        elif support_size_est < support_size:
+            lambd.value = (lambd_lowwer + lambd.value) / 2
+        else:
+            break
     
-    return min_estimator
+    estimator[abs(estimator) < tol] = 0.0
+    return estimator, lambd.value
