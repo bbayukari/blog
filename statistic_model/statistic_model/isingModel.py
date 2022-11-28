@@ -1,5 +1,4 @@
 import numpy as np
-import jax.numpy as jnp
 import statistic_model_pybind
 import cvxpy as cp
 

@@ -1,4 +1,3 @@
-from math import exp, log
 import numpy as np
 import cvxpy as cp
 import statistic_model_pybind
