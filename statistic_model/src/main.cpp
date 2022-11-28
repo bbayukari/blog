@@ -11,6 +11,7 @@
 //#include "autodiff/forward/dual/eigen.hpp" // not needed because ising_model() does not use Matrix multiplication of Eigen 
 
 using Eigen::MatrixXd;
+using Eigen::MatrixXi;
 using Eigen::VectorXd;
 using Eigen::VectorXi;
 using Eigen::ArrayXd;
@@ -22,6 +23,14 @@ using autodiff::dual2nd;
 //**********************************************************************************
 // util func
 //**********************************************************************************
+VectorXd slice(VectorXd const &v, VectorXi const &idx) {
+    VectorXd v2(idx.size());
+    for (int i = 0; i < idx.size(); i++) {
+        v2(i) = v(idx(i));
+    }
+    return v2;
+}
+
 MatrixXd slice(MatrixXd const &mat, VectorXi const &ind, int axis = 1) {
     MatrixXd A;
     if (axis == 0) {
@@ -112,7 +121,7 @@ Eigen::MatrixXd comp_conf(int num_conf, int p){
 }
 
 // n is the number of samples
-Eigen::MatrixXd sample_by_conf(int n, Eigen::MatrixXd theta, int seed) {
+Eigen::MatrixXd sample_by_conf(int sample_size, Eigen::MatrixXd theta, int seed) {
   int p = theta.rows();
   int num_conf = pow(2, p);
   
@@ -125,13 +134,13 @@ Eigen::MatrixXd sample_by_conf(int n, Eigen::MatrixXd theta, int seed) {
   
   for (int num = 0; num < num_conf; num++) {
     Eigen::VectorXd conf = table.row(num);
-    weight(num) = 0.5 * (double) (conf.transpose() * theta_off * conf) + (double) (vec_diag.transpose() * conf);
+    weight(num) = 0.5 * (double) (conf.transpose() * theta_off * conf);
   }
   weight = weight.array().exp();
   
   std::vector<double> w;
   w.resize(weight.size());
-  Eigen::VectorXd::Map(&w[0], weight.size()) = weight;
+  Eigen::VectorXd::Map(w.data(), weight.size()) = weight;
   
   // int sd = (((long long int)time(0)) * 2718) % 314159265;
   // Rcout << "Seed: "<< sd << endl;
@@ -144,15 +153,13 @@ Eigen::MatrixXd sample_by_conf(int n, Eigen::MatrixXd theta, int seed) {
   
   Eigen::VectorXd freq = Eigen::VectorXd::Zero(num_conf);
   
-  for (int i = 0; i < n; i++) {
-    int num = distribution(generator);
-    freq(num)++;
+  for (int i = 0; i < sample_size; i++) {
+    freq(distribution(generator))++;
   }
   
   Eigen::MatrixXd data(num_conf, p + 1);
   data.col(0) = freq;
-  // replace -1 with 0 in table
-  data.rightCols(p) = table.array() * 0.5 + 0.5;
+  data.rightCols(p) = table;
   return data;
 }
 
@@ -160,18 +167,19 @@ struct IsingData{
     MatrixXd table;
     VectorXd freq;
     const int p;
+    MatrixXi index_translator;
     IsingData(MatrixXd X): p(X.cols()-1) {
-        std::vector<int> index;
-        for(Eigen::Index i = 0; i < X.rows(); i++){
-            if(X(i,0) > 0.5){
-                index.push_back(i);
+        table = X.rightCols(p);
+        freq = X.col(0);
+
+        index_translator.resize(p,p);
+        int count = 0;
+        for(Eigen::Index i = 0; i < p; i++){
+            for(Eigen::Index j = i+1; j < p; j++){
+                index_translator(i,j) = count;
+                index_translator(j,i) = count;
+                count++;
             }
-        }
-        freq.resize(index.size());
-        table.resize(index.size(),p);
-        for(Eigen::Index i = 0; i < index.size(); i++){
-            freq(i) = X(index[i],0);
-            table.row(i) = X.row(index[i]).tail(p);
         }
     }
 };
@@ -182,12 +190,87 @@ template <class T>
 T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, py::object const& ex_data) {
     IsingData* data = ex_data.cast<IsingData*>();
     T loss = T(0.0);
-    bool has_intercept = intercept.size() == data->p;
 
+    for(int i = 0; i < data->table.rows(); i++){
+        for(int k=0; k< data->p; k++){
+            T tmp = T(0.0);
+            for(int j = 0; j < data->p; j++){
+                if (j == k) continue;
+                tmp += data->table(i,k) * data->table(i,j) * para(data->index_translator(k,j));
+            }
+            loss += data->freq(i) * log(1+exp(-2 * tmp));
+        }
+    }
+    return loss;
+}
+
+VectorXd ising_grad(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+    IsingData* data = ex_data.cast<IsingData*>();
+    VectorXd grad_para = VectorXd::Zero(para.size());
+
+    for(int i = 0; i < data->table.rows(); i++){
+        for(int k=0; k< data->p; k++){
+            double tmp = 0.0;
+            for(int j = 0; j < data->p; j++){
+                if (j == k) continue;
+                tmp += data->table(i,k) * data->table(i,j) * para(data->index_translator(k,j));
+            }
+            double exp_tmp = 2 * data->freq(i) * data->table(i,k)  / (1+exp(2 * tmp));
+            for(int j = 0; j < data->p; j++){
+                if (j == k) continue;
+                grad_para(data->index_translator(k,j)) -= exp_tmp * data->table(i,j);
+            }
+        }
+    }
+
+    return slice(grad_para,compute_para_index);
+}
+
+MatrixXd ising_hess_diag(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+    if (compute_para_index.size() > 1){
+        throw std::runtime_error("Hessian diagonal is only available for one parameter at a time.");
+    }
+    
+    static VectorXd hess_diag_para(para.size());
+    static VectorXd para_last; // store the last para
+
+    // if para is not changed, return the last hessian diagonal; otherwise, recompute the hessian diagonal
+    if(para_last.size() != para.size() || (para - para_last).squaredNorm() > 1e-6){
+        hess_diag_para.setZero();
+        para_last = para;
+        IsingData* data = ex_data.cast<IsingData*>();
+
+        for(int i = 0; i < data->table.rows(); i++){
+            for(int k=0; k< data->p; k++){
+                double tmp = 0.0;
+                for(int j = 0; j < data->p; j++){
+                    if (j == k) continue;
+                    tmp += data->table(i,k) * data->table(i,j) * para(data->index_translator(k,j));
+                }
+                double phi = 1.0 / (1.0 + exp(2 * tmp));
+                double h = 4 * data->freq(i) * phi * (1 - phi);
+                for(int j = 0; j < data->p; j++){
+                    if (j == k) continue;
+                    hess_diag_para(data->index_translator(k,j)) += h;
+                }
+            }
+        }
+    }
+   
+    return hess_diag_para(compute_para_index(0)) * MatrixXd::Identity(1,1);
+}
+
+/*
+template <class T>
+T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, py::object const& ex_data) noexcept{
+    IsingData* data = ex_data.cast<IsingData*>();
+    T loss = T(0.0);
+    bool has_intercept = intercept.size() == data->p;
+    
     for(int i = 0; i < data->table.rows(); i++){
         int idx = 0;
         for(int s = 0; s < data->p; s++){
-            if (has_intercept){
+            if(has_intercept){
                 loss -= data->freq(i) * data->table(i,s) * intercept(s);
             }
             for(int t = s+1; t < data->p; t++){
@@ -197,16 +280,85 @@ T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, p
         for(int s = 0; s < data->p; s++){
             T tmp = has_intercept ? intercept(s) : T(0.0);
             for(int t = 0; t < data->p; t++){
-                if(t > s)
-                    tmp += para((2*data->p-s)*(s+1)/2+t-s-1-data->p) * data->table(i,t);
-                else if(t < s)
-                    tmp += para((2*data->p-t)*(t+1)/2+s-t-1-data->p) * data->table(i,t);
+                if (t == s) continue;
+                tmp += para(data->index_translator(s,t)) * data->table(i,t);
             }
             loss += data->freq(i) * log(1+exp(tmp));
         }
     }
     return loss;
 }
+VectorXd ising_grad_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+    IsingData* data = ex_data.cast<IsingData*>();
+    VectorXd grad_para = VectorXd::Zero(para.size());
+
+    for(int i = 0; i < data->table.rows(); i++){
+        int idx = 0;
+        for(int s = 0; s < data->p; s++){
+            for(int t = s+1; t < data->p; t++){
+                grad_para(idx) -= 2 * data->freq(i) * data->table(i,s) * data->table(i,t);
+                idx += 1;
+            }
+        }
+        for(int s = 0; s < data->p; s++){
+            double local_loss = 0.0;
+            for(int t = 0; t < data->p; t++){
+                if(t != s){
+                    local_loss += para(data->index_translator(s,t)) * data->table(i,t);
+                }
+            }
+            double local_grad_coef = data->freq(i) / (1+exp(-local_loss));
+            for(int t = 0; t < data->p; t++){
+                if(t != s){
+                    grad_para(data->index_translator(s,t)) += local_grad_coef * data->table(i,t);
+                }
+            }
+        }
+    }
+
+    VectorXd grad = VectorXd::Zero(compute_para_index.size());
+    for(Eigen::Index i=0; i<compute_para_index.size(); i++){
+        grad(i) = grad_para(compute_para_index(i));
+    }
+    return grad;
+}
+
+MatrixXd ising_hess_diag_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+    if (compute_para_index.size() > 1){
+        throw std::runtime_error("Hessian diagonal is only available for one parameter at a time.");
+    }
+    
+    static VectorXd hess_diag_para(para.size());
+    static VectorXd para_last; // store the last para
+
+    // if para is not changed, return the last hessian diagonal; otherwise, recompute the hessian diagonal
+    if(para_last.size() != para.size() || (para - para_last).squaredNorm() > 1e-6){
+        hess_diag_para.setZero();
+        para_last = para;
+        IsingData* data = ex_data.cast<IsingData*>();
+
+        for(int i = 0; i < data->table.rows(); i++){
+            for(int s = 0; s < data->p; s++){
+                double local_loss = 0.0;
+                for(int t = 0; t < data->p; t++){
+                    if(t != s){
+                        local_loss += para(data->index_translator(s,t)) * data->table(i,t);
+                    }
+                }
+                double logistic_coef = 1.0 / (1+exp(-local_loss));
+                double local_hess_coef = data->freq(i) * logistic_coef * (1-logistic_coef);
+                for(int t = 0; t < data->p; t++){
+                    if(t != s){
+                        hess_diag_para(data->index_translator(s,t)) += local_hess_coef * data->table(i,t);
+                    }
+                }
+            }
+        }
+    }
+   
+    return hess_diag_para(compute_para_index(0)) * MatrixXd::Identity(1,1);
+}
+*/
 
 //**********************************************************************************
 // pybind11 module
@@ -237,4 +389,8 @@ PYBIND11_MODULE(statistic_model_pybind,m) {
         "ising_model",
         py::overload_cast<Matrix<dual2nd, -1, 1> const&, Matrix<dual2nd, -1, 1> const&, py::object const&>(
             &ising_model<dual2nd>));
+    // ising model explicit expression
+    m.def("ising_loss", &ising_model<double>);
+    m.def("ising_grad", &ising_grad);
+    m.def("ising_hess_diag", &ising_hess_diag);
 }

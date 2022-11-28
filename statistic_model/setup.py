@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name="statistic_model",
     packages=find_packages(),
-    version="0.0.1",
+    version="0.0.2",
     author="",
     author_email="",
     url="",
@@ -16,6 +16,7 @@ setup(
             include_dirs=["/data/home/wangzz/.local/include"],
             # Example: passing in the version to the compiled code
             cxx_std=17,
+            extra_compile_args=["-O3", "-Werror", "-DNDEBUG"],
             ),
     ],
     install_requires=["numpy", "jax"],

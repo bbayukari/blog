@@ -2,7 +2,7 @@ import cvxpy as cp
 import numpy as np
 
 
-def Lasso(loss_cvxpy, dim, support_size, data=None, init_lambda=1000.0, max_iter=100):
+def Lasso(loss_cvxpy, dim, support_size, data=None, tol=1, init_lambda=1.0, max_iter=100):
     """lasso algorithm
     Args:
         loss_cvxpy: cvxpy function (x, data) -> loss_value
@@ -29,7 +29,6 @@ def Lasso(loss_cvxpy, dim, support_size, data=None, init_lambda=1000.0, max_iter
     for i in range(max_iter):
         problem.solve()
         estimator = x.value
-        tol = np.mean(np.partition(np.abs(estimator), -support_size)[-support_size:]) / 10
         support_size_est = np.array(abs(estimator) > tol).sum() 
 
         if support_size_est > support_size:

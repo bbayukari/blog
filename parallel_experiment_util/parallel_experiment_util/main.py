@@ -1,10 +1,11 @@
 import pandas as pd
 import multiprocessing as mp
 import numpy as np
-from .util import product_dict
+import time
+import os
 
 class ParallelExperiment:
-    def __init__(self, task, in_keys, out_keys, processes=1, name="test"):
+    def __init__(self, task, in_keys, out_keys, processes=1, name="test", memory_limit=100):
         """
         in_keys:
             in_keys are arrays of strings which will be the keys of task's in_para.
@@ -18,8 +19,17 @@ class ParallelExperiment:
         self.name = name
         self.results = []  # 'results' is a list of dict
         self.processes = processes
+        self.memory_limit = memory_limit
 
     def task_parallel(self, para):
+        while True:
+            f = os.popen('free -g').readlines()
+            mem = int(str(f).split()[9])
+            if mem < self.memory_limit:
+                break
+            else:
+                time.sleep(10)
+
         try:
             result = self.task(**para)
         except Exception as e:

@@ -73,14 +73,14 @@ def para_generator(*args, repeat=1, seed=None):
                 if seed is not None:
                     para['seed'] = seed
                     seed += 1
-                yield para
+                yield para.copy()
 
 
 if __name__ == "__main__":
-    for para in para_generator(
+    print([para for para in para_generator(
             {"n": [i * 100 + 100 for i in range(5)], "p": [500], "k": [50]},
             {"n": [500], "p": [i * 100 + 100 for i in range(5)], "k": [50]},
             repeat=3,
             seed=1234
-    ):
-        print(para)
+    )])
+   
