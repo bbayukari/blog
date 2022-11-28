@@ -5,7 +5,7 @@ import time
 import os
 
 class ParallelExperiment:
-    def __init__(self, task, in_keys, out_keys, processes=1, name="test", memory_limit=100):
+    def __init__(self, task, in_keys, out_keys, processes=1, name="test", memory_limit=10):
         """
         in_keys:
             in_keys are arrays of strings which will be the keys of task's in_para.
@@ -28,7 +28,8 @@ class ParallelExperiment:
             if mem < self.memory_limit:
                 break
             else:
-                time.sleep(10)
+                print("Memory has been used {} GB, waiting...", mem, flush=True)
+                time.sleep(100)
 
         try:
             result = self.task(**para)
