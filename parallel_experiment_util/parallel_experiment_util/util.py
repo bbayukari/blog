@@ -67,9 +67,13 @@ def para_generator(*args, repeat=1, seed=None):
             seed=1234
         )
     """
-    for group_of_para in args:
+    # if repeat is not iterable, make it iterable
+    if not hasattr(repeat, "__iter__"):
+        repeat = [repeat] * len(args)
+
+    for group_of_para, iter in zip(args,repeat):
         for para in product_dict(**group_of_para):
-            for i in range(repeat):
+            for i in range(iter):
                 if seed is not None:
                     para['seed'] = seed
                     seed += 1
@@ -78,9 +82,9 @@ def para_generator(*args, repeat=1, seed=None):
 
 if __name__ == "__main__":
     print([para for para in para_generator(
-            {"n": [i * 100 + 100 for i in range(5)], "p": [500], "k": [50]},
-            {"n": [500], "p": [i * 100 + 100 for i in range(5)], "k": [50]},
-            repeat=3,
+            {"n": [i * 100 + 100 for i in range(2)], "p": [500], "k": [50]},
+            {"n": [500], "p": [i * 100 + 100 for i in range(2)], "k": [50]},
+            repeat=[2,3],
             seed=1234
     )])
    

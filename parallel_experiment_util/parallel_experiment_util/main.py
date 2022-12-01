@@ -28,7 +28,7 @@ class ParallelExperiment:
             if mem < self.memory_limit:
                 break
             else:
-                print("Memory has been used {} GB, waiting...", mem, flush=True)
+                print("Memory has been used", mem, "GB, waiting...", flush=True)
                 time.sleep(100)
 
         try:
