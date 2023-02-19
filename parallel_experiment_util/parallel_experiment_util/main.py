@@ -1,23 +1,10 @@
 import pandas as pd
 import multiprocessing as mp
 import numpy as np
-import time
 import psutil
-from functools import wraps
 from typing import List, Dict
 
 class ParallelExperiment:
-    @staticmethod
-    def timethis(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            start = time.process_time()
-            r = func(*args, **kwargs)
-            end = time.process_time()
-            return r, end - start
-
-        return wrapper
-
     def __init__(
         self, task, in_keys, out_keys, processes=1, name="test", memory_limit=10
     ):

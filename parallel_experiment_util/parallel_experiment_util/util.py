@@ -1,5 +1,7 @@
 from itertools import product
 import numpy as np
+from functools import wraps
+import time
 
 def product_dict(**kwargs):
     """
@@ -79,6 +81,15 @@ def para_generator(*args, repeat=1, seed=None):
                     seed += 1
                 yield para.copy()
 
+def timethis(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.process_time()
+        r = func(*args, **kwargs)
+        end = time.process_time()
+        return r, end - start
+
+    return wrapper
 
 if __name__ == "__main__":
     print([para for para in para_generator(
