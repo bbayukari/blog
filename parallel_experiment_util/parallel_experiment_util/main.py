@@ -3,6 +3,7 @@ import multiprocessing as mp
 import numpy as np
 import psutil
 from typing import List, Dict
+import time
 
 class ParallelExperiment:
     def __init__(

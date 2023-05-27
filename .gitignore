@@ -3,3 +3,5 @@
 *.egg-info/
 .vscode/
 __pycache__/
+tem_*
+*.out

@@ -67,18 +67,18 @@ struct RegressionData {
 //**********************************************************************************
 // linear model 
 //**********************************************************************************
-double linear_loss_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data) {
+double linear_loss_no_intercept(VectorXd const& para, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();  // unwrap the pointer
     return (data->x * para - data->y).squaredNorm();  // compute the loss
 }
-VectorXd linear_gradient_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+VectorXd linear_gradient_no_intercept(VectorXd const& para, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();  // unwrap the pointer
-    VectorXd result = 2 * slice(data->x,compute_para_index).transpose() * (data->x * para - data->y);
+    VectorXd result = 2 * data->x.transpose() * (data->x * para - data->y);
     return result;  // compute the gradient
 }
-MatrixXd linear_hessian_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+MatrixXd linear_hessian_no_intercept(VectorXd const& para, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();  // unwrap the pointer
-    MatrixXd X_compute = slice(data->x,compute_para_index);
+    MatrixXd X_compute = data->x;
     MatrixXd result = 2 * X_compute.transpose() * X_compute;
     return result;  // compute the hessian
 }
@@ -86,22 +86,22 @@ MatrixXd linear_hessian_no_intercept(VectorXd const& para, VectorXd const& inter
 //**********************************************************************************
 // logistic model
 //**********************************************************************************
-double logistic_loss_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data) {
+double logistic_loss_no_intercept(VectorXd const& para, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();
     ArrayXd xbeta = (data->x * para).array();
     return ((xbeta.exp()+1.0).log() - (data->y).array()*xbeta).sum();
 }
 
-VectorXd logistic_gradient_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+VectorXd logistic_gradient_no_intercept(VectorXd const& para, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();
     ArrayXd xbeta_exp = (data->x * para).array().exp();
-    return slice(data->x,compute_para_index).transpose() * (xbeta_exp / (xbeta_exp + 1.0) - (data->y).array()).matrix();
+    return data->x.transpose() * (xbeta_exp / (xbeta_exp + 1.0) - (data->y).array()).matrix();
 }
 
-MatrixXd logistic_hessian_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+MatrixXd logistic_hessian_no_intercept(VectorXd const& para, py::object const& ex_data) {
     RegressionData* data = ex_data.cast<RegressionData*>();
     ArrayXd xbeta_exp = (data->x * para).array().exp();
-    MatrixXd X_compute = slice(data->x,compute_para_index);
+    MatrixXd X_compute = data->x;
     return X_compute.transpose() * (1.0 / (xbeta_exp + 1.0 / xbeta_exp + 2.0) * X_compute.array()).matrix();
 }
 
@@ -187,7 +187,7 @@ struct IsingData{
 // Ising model loss
 //**********************************************************************************
 template <class T>
-T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, py::object const& ex_data) {
+T ising_model(Matrix<T, -1, 1> const& para, py::object const& ex_data) {
     IsingData* data = ex_data.cast<IsingData*>();
     T loss = T(0.0);
 
@@ -204,7 +204,7 @@ T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, p
     return loss;
 }
 
-VectorXd ising_grad(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+VectorXd ising_grad(VectorXd const& para, py::object const& ex_data) {
     IsingData* data = ex_data.cast<IsingData*>();
     VectorXd grad_para = VectorXd::Zero(para.size());
 
@@ -223,14 +223,10 @@ VectorXd ising_grad(VectorXd const& para, VectorXd const& intercept, py::object 
         }
     }
 
-    return slice(grad_para,compute_para_index);
+    return grad_para;
 }
 
-MatrixXd ising_hess_diag(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
-    if (compute_para_index.size() > 1){
-        throw std::runtime_error("Hessian diagonal is only available for one parameter at a time.");
-    }
-    
+MatrixXd ising_hess_diag(VectorXd const& para, py::object const& ex_data) {  
     static VectorXd hess_diag_para(para.size());
     static VectorXd para_last; // store the last para
 
@@ -256,8 +252,8 @@ MatrixXd ising_hess_diag(VectorXd const& para, VectorXd const& intercept, py::ob
             }
         }
     }
-   
-    return hess_diag_para(compute_para_index(0)) * MatrixXd::Identity(1,1);
+
+    return hess_diag_para.asDiagonal();
 }
 
 /*
@@ -288,7 +284,7 @@ T ising_model(Matrix<T, -1, 1> const& para, Matrix<T, -1, 1> const& intercept, p
     }
     return loss;
 }
-VectorXd ising_grad_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+VectorXd ising_grad_no_intercept(VectorXd const& para, py::object const& ex_data, VectorXi const& compute_para_index) {
     IsingData* data = ex_data.cast<IsingData*>();
     VectorXd grad_para = VectorXd::Zero(para.size());
 
@@ -323,7 +319,7 @@ VectorXd ising_grad_no_intercept(VectorXd const& para, VectorXd const& intercept
     return grad;
 }
 
-MatrixXd ising_hess_diag_no_intercept(VectorXd const& para, VectorXd const& intercept, py::object const& ex_data, VectorXi const& compute_para_index) {
+MatrixXd ising_hess_diag_no_intercept(VectorXd const& para, py::object const& ex_data, VectorXi const& compute_para_index) {
     if (compute_para_index.size() > 1){
         throw std::runtime_error("Hessian diagonal is only available for one parameter at a time.");
     }
@@ -380,14 +376,14 @@ PYBIND11_MODULE(statistic_model_pybind,m) {
     py::class_<IsingData>(m, "IsingData").def(py::init<MatrixXd>());
     // ising model
     m.def("ising_model",
-          py::overload_cast<Matrix<double, -1, 1> const&, Matrix<double, -1, 1> const&, py::object const&>(
+          py::overload_cast<Matrix<double, -1, 1> const&, py::object const&>(
               &ising_model<double>));
     m.def("ising_model",
-          py::overload_cast<Matrix<dual, -1, 1> const&, Matrix<dual, -1, 1> const&, py::object const&>(
+          py::overload_cast<Matrix<dual, -1, 1> const&, py::object const&>(
               &ising_model<dual>));
     m.def(
         "ising_model",
-        py::overload_cast<Matrix<dual2nd, -1, 1> const&, Matrix<dual2nd, -1, 1> const&, py::object const&>(
+        py::overload_cast<Matrix<dual2nd, -1, 1> const&, py::object const&>(
             &ising_model<dual2nd>));
     // ising model explicit expression
     m.def("ising_loss", &ising_model<double>);

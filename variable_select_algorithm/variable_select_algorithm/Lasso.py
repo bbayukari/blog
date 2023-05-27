@@ -2,7 +2,7 @@ import cvxpy as cp
 import numpy as np
 
 
-def Lasso(loss_cvxpy, dim, support_size, data=None, tol=1, init_lambda=1.0, max_iter=100):
+def Lasso(loss_cvxpy, dim, support_size, data=None, tol=0.01, init_lambda=1.0, max_iter=100):
     """lasso algorithm
     Args:
         loss_cvxpy: cvxpy function (x, data) -> loss_value

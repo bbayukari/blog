@@ -13,6 +13,8 @@ setup(
         Pybind11Extension("python_example",
             ["src/main.cpp"],
             # Example: passing in the version to the compiled code
+            #include_dirs
+            #extra_compile_args=["-O3", "-Werror", "-DNDEBUG"],
             cxx_std=17,
             ),
     ],

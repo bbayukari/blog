@@ -28,10 +28,10 @@ def ising_generator(P, N, Edges, seed, strength=0.5):
     return data[np.where(data[:,0] > 0.5)[0],], theta, flatten_theta
 
 def ising_loss(para, data):
-    return statistic_model_pybind.ising_loss(para, np.zeros(0), data)
+    return statistic_model_pybind.ising_loss(para, data)
 
-def ising_grad(para, data, compute_para_index):
-    return statistic_model_pybind.ising_grad(para, np.zeros(0), data, compute_para_index)
+def ising_grad(para, data):
+    return statistic_model_pybind.ising_grad(para, data)
 
 class IsingData:
     def __init__(self, data):
